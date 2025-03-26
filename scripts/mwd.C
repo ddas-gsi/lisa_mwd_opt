@@ -144,13 +144,25 @@ double mwd(int channelID, double smoothing_L, double MWD_length, double MWD_trac
     TTreeReaderValue<EventHeader> Header(reader, "EventHeader.");
 
     // Define a unique histogram name based on parameters
-    TString lisa_Energy_histName = Form("lisa_Energy_ch%d_sL%d_MWD%d_start%d_stop%d",
-                                        channelID, int(smoothing_L), int(MWD_length), int(MWD_trace_start), int(MWD_trace_stop));
+    TString lisa_trace_histName = Form("lisa_Trace_L_%d_M_%d_k0_%d_kend_%d",
+                                       int(smoothing_L), int(MWD_length), int(MWD_trace_start), int(MWD_trace_stop));
+
+    TString lisa_MWD_histName = Form("lisa_MWD_L_%d_M_%d_k0_%d_kend_%d",
+                                     int(smoothing_L), int(MWD_length), int(MWD_trace_start), int(MWD_trace_stop));
+
+    TString lisa_Energy_histName = Form("lisa_Energy_L_%d_M_%d_k0_%d_kend_%d",
+                                        int(smoothing_L), int(MWD_length), int(MWD_trace_start), int(MWD_trace_stop));
+
+    // TString lisa_Energy_histTitle = Form("lisa_Energy >> L:%d M:%d k0:%d kend:%d a:%d b:%d c:%d d:%d",
+    //                                      int(smoothing_L), int(MWD_length), int(MWD_trace_start), int(MWD_trace_stop) int(MWD_amp_start), int(MWD_amp_stop), int(MWD_baseline_start), int(MWD_baseline_stop));
 
     TH2F *lisa_Trace = new TH2F("lisa_Trace", "lisa_Trace", 2000, 0, 2000, 4000, -500, 100);
-    TH2F *lisa_MWD = new TH2F("lisa_MWD", "lisa_MWD", 2000, 0, 1000, 4000, -500, 100);
+    // TH2F *lisa_Trace = new TH2F(lisa_trace_histName, "lisa_Trace", 2000, 0, 2000, 4000, -500, 100);
+    // TH2F *lisa_MWD = new TH2F("lisa_MWD", "lisa_MWD", 2000, 0, 1000, 4000, -500, 100);
+    TH2F *lisa_MWD = new TH2F(lisa_MWD_histName, "lisa_MWD", 2000, 0, 1000, 4000, -500, 100);
     // TH1F *lisa_Energy = new TH1F("lisa_Energy", "lisa_Energy", 1000, 10, 500);
     TH1F *lisa_Energy = new TH1F(lisa_Energy_histName, "lisa_Energy", 1000, 10, 500);
+    // TH1F *lisa_Energy = new TH1F(lisa_Energy_histName, lisa_Energy_histTitle, 1000, 10, 500);
     // TH1F *lisa_Energy_cloned = new TH1F("lisa_Energy_cloned", "lisa_Energy", 1000, -10, 500);
 
     int k = 0;
@@ -281,11 +293,25 @@ double mwd(int channelID, double smoothing_L, double MWD_length, double MWD_trac
 
     TString histFileName = Form("./histos/hist_%d_%d_%d_%d.root", int(smoothing_L), int(MWD_length), int(MWD_trace_start), int(MWD_trace_stop));
     TFile f(histFileName, "RECREATE");
+    lisa_Energy->SetTitle(Form("lisa_Energy >> Res:%.6f L:%d M:%d k0:%d kend:%d a:%d b:%d c:%d d:%d",
+                               Resolution_2, int(smoothing_L), int(MWD_length), int(MWD_trace_start), int(MWD_trace_stop),
+                               int(MWD_amp_start), int(MWD_amp_stop), int(MWD_baseline_start), int(MWD_baseline_stop)));
     lisa_Energy->Write();
     f.Close();
 
-    std::cout << "HISTOGRAM:" << lisa_Energy_histName << std::endl;
-    std::cout << "HISTFILE: " << histFileName << std::endl;
+    std::cout << "LISA_ENERGY:" << lisa_Energy_histName << std::endl;
+    std::cout << "LISA_ENERGY_FILE: " << histFileName << std::endl;
+
+    TString lisa2DHistFileName = Form("./histos/lisaTrace_%d_%d_%d_%d.root", int(smoothing_L), int(MWD_length), int(MWD_trace_start), int(MWD_trace_stop));
+    TFile f2(lisa2DHistFileName, "RECREATE");
+    lisa_Trace->Write();
+    lisa_MWD->Write();
+    f2.Close();
+
+    // std::cout << "LISA_TRACE:" << lisa_trace_histName << std::endl;
+    std::cout << "LISA_TRACE:" << "lisa_Trace" << std::endl;
+    std::cout << "LISA_MWD:" << lisa_MWD_histName << std::endl;
+    std::cout << "LISA_TRACE_FILE: " << lisa2DHistFileName << std::endl;
 
     return Resolution_2;
 

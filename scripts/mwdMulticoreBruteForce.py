@@ -6,6 +6,8 @@
 # This script runs MWD calculations in multiple parallel processes
 # to speed up the brute-force search of the best parameter set 
 # for optimal energy resolution of LISA Diamond detectors
+# 
+# The lowest resolution is 1.3761951, with parameters: (200.0, 700.0, 2000.0, 4500.0, 2825.0, 3075.0, 2125.0, 2375.0)
 # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 
@@ -21,10 +23,10 @@ import subprocess
 import re
 
 # Parameter ranges
-smoothing_L_range = np.linspace(200, 600, 5)              # Smoothing_L[ns]          
-MWD_length_range = np.linspace(500, 1500, 11)             # Trapez_moving_window_length[ns]   
+smoothing_L_range = np.linspace(200, 600, 3)              # Smoothing_L[ns]          
+MWD_length_range = np.linspace(500, 1500, 2)             # Trapez_moving_window_length[ns]   
 MWD_trace_start_range = np.linspace(1800, 2000, 3)        # Trapez_sample_window_0[ns]
-MWD_trace_stop_range = np.linspace(4000, 4500, 6)         # Trapez_sample_window_1[ns]
+MWD_trace_stop_range = np.linspace(4000, 4500, 3)         # Trapez_sample_window_1[ns]
 
 # Define CPU usage for parallel processing
 cpu_usage = 0.5                                           # Use 50% of available CPU cores
@@ -60,18 +62,41 @@ def worker_function(params):
     stop_time = datetime.now()
     print('Duration:', stop_time - start_time)
 
-    histMatch = re.search(r"HISTOGRAM:\s*(\S+)", result.stdout)
-    histName = histMatch.group(1) if histMatch else None
+    # histMatch = re.search(r"HISTOGRAM:\s*(\S+)", result.stdout)
+    # histName = histMatch.group(1) if histMatch else None
 
-    histFileMatch = re.search(r"HISTFILE:\s*(\S+)", result.stdout)
-    histFile = histFileMatch.group(1) if histFileMatch else None
+    # histFileMatch = re.search(r"HISTFILE:\s*(\S+)", result.stdout)
+    # histFile = histFileMatch.group(1) if histFileMatch else None
 
-    return resolution, params, histName, histFile
+    lisaEnergyMatch = re.search(r"LISA_ENERGY:\s*(\S+)", result.stdout)
+    lisaEnergyHistName = lisaEnergyMatch.group(1) if lisaEnergyMatch else None
+
+    lisaEnergyFileMatch = re.search(r"LISA_ENERGY_FILE:\s*(\S+)", result.stdout)
+    lisaEnergyHistFile = lisaEnergyFileMatch.group(1) if lisaEnergyFileMatch else None
+
+    lisaTraceMatch = re.search(r"LISA_TRACE:\s*(\S+)", result.stdout)
+    lisaTraceHistName = lisaTraceMatch.group(1) if lisaTraceMatch else None
+
+    lisaMWDMatch = re.search(r"LISA_MWD:\s*(\S+)", result.stdout)
+    lisaMWDHistName = lisaMWDMatch.group(1) if lisaMWDMatch else None
+
+    lisaTraceFileMatch = re.search(r"LISA_TRACE_FILE:\s*(\S+)", result.stdout)
+    lisaTraceHistFile = lisaTraceFileMatch.group(1) if lisaTraceFileMatch else None
+
+    # return resolution, params, histName, histFile
+    return resolution, params, lisaEnergyHistName, lisaEnergyHistFile, lisaTraceHistName, lisaMWDHistName, lisaTraceHistFile
+    
+    
     
 
 
 def mwd_multicore():
+
+    start_time = datetime.now()
+
     param_combinations = list(product(smoothing_L_range, MWD_length_range, MWD_trace_start_range, MWD_trace_stop_range))
+
+    print(f"Total sets of parameters {len(param_combinations)} ...")
 
     filtered_param_combinations = []
 
@@ -94,40 +119,88 @@ def mwd_multicore():
     with Pool(processes=use_cores) as pool:
         results = pool.map(worker_function, filtered_param_combinations)
 
-    Resolution_dict = {}
-    for resolution, params, _, _ in results:
+    Res_dict = {}
+    for resolution, params, _, _, _, _, _ in results:
         if resolution is not None:
             if resolution > 0:
-                Resolution_dict[resolution] = params
+                Res_dict[resolution] = params
     
-    if Resolution_dict:
-        lowest_resolution = min(Resolution_dict.keys())  
-        params_for_lowest_resolution = Resolution_dict[lowest_resolution]  
-        print(f"The lowest resolution is {lowest_resolution}, with parameters: {params_for_lowest_resolution}")
+    sorted_res = sorted(Res_dict.items())
+
+    output_filename = "resolution_results.txt"
+    with open(output_filename, "w") as file:
+        file.write("Resolution\tParameters\n")
+        for res, params in sorted_res:
+            file.write(f"{res:.6f}\t{params}\n")
+
+    if sorted_res:
+        opt_res, params_for_opt_res = sorted_res[0]
+        print(f"The lowest resolution is {opt_res}, with parameters: {params_for_opt_res}")
+        print(f"All resolutions and parameters saved to {output_filename}")
     else:
         print("No valid resolutions found.")
                 
-    output_file = ROOT.TFile("merged_lisa_Energy_histos.root", "RECREATE")
-    hList = ROOT.TList()
-    for _, _, histName, histFile in results:
-        if histFile:
-            temp_file = ROOT.TFile(histFile, "READ")
-            hist = temp_file.Get(histName)  
-            if hist:
-                output_file.cd()
-                hist.Write()
-                hList.Add(hist)
-            temp_file.Close()
+    # Create output ROOT files
+    energy_hist_file = ROOT.TFile("merged_lisa_Energy_histos.root", "RECREATE")
+    trace_hist_file = ROOT.TFile("merged_lisa_Trace_histos.root", "RECREATE")
 
+    hList = ROOT.TList()
+
+    # Separate results into two lists: 
+    # - `positive_res_results` for histograms with resolution > 0
+    # - `non_positive_res_results` for histograms with resolution <= 0
+    positive_res_results = [res for res in results if res[0] is not None and res[0] > 0]
+    non_positive_res_results = [res for res in results if res[0] is not None and res[0] <= 0]
+
+    # Merge the two lists, ensuring that positive resolutions are written first
+    sorted_results = sorted(positive_res_results) + sorted(non_positive_res_results)
+
+    # Flag to track if lisaTraceHist has been written
+    trace_hist_written = False
+
+    # Process histograms in the required order
+    for resolution, params, lisaEnergyHistName, lisaEnergyHistFile, lisaTraceHistName, lisaMWDHistName, lisaTraceHistFile in sorted_results:
+        if lisaEnergyHistFile:
+            temp_Energy_file = ROOT.TFile(lisaEnergyHistFile, "READ")
+            energyHist = temp_Energy_file.Get(lisaEnergyHistName)  
+            if energyHist:
+                energy_hist_file.cd()
+                energyHist.Write()
+                hList.Add(energyHist)
+            temp_Energy_file.Close()
+
+        if lisaTraceHistFile:
+            temp_Trace_file = ROOT.TFile(lisaTraceHistFile, "READ")
+        
+            if not trace_hist_written:  # Only write lisaTraceHist once
+                lisaTraceHist = temp_Trace_file.Get(lisaTraceHistName)
+                if lisaTraceHist:
+                    trace_hist_file.cd()
+                    lisaTraceHist.Write()
+                    trace_hist_written = True  # Mark as written
+
+            lisaMWDHist = temp_Trace_file.Get(lisaMWDHistName)
+            if lisaMWDHist:
+                trace_hist_file.cd()
+                lisaMWDHist.Write()
+        
+            temp_Trace_file.Close()
+
+                
     # if hList:
     #     output_file.cd()
     #     hList.Write("Energy_histos", ROOT.TObject.kSingleKey)
 
-    output_file.Close()
+    energy_hist_file.Close()
+    print("All LISA Energy histograms saved to merged_lisa_Energy_histos.root")
 
+    trace_hist_file.Close()
+    print("All LISA Trace histograms saved to merged_lisa_Trace_histos.root")
+    
+    stop_time = datetime.now()
+    print('Total Script RunTime:', stop_time - start_time)
 
-
-                
+  
 
 if __name__ == '__main__':
     mwd_multicore()
@@ -164,7 +237,7 @@ if __name__ == '__main__':
 
 # param_combinations = list(product(smoothing_L_range, MWD_length_range, MWD_trace_start_range, MWD_trace_stop_range))
 
-# Resolution_dict = {}
+# Res_dict = {}
 
 # # Run the script for all parameter sets
 # for params in param_combinations:
@@ -187,7 +260,7 @@ if __name__ == '__main__':
 #     if match:
 #         Resolution = float(match.group(1))
 #         print(f"Parameters {params} give Resolution = {Resolution}")
-#         Resolution_dict[Resolution] = params
+#         Res_dict[Resolution] = params
 #     else:
 #         print(f"Error: Resolution not found in output for parameters {params}.")
 
@@ -196,10 +269,10 @@ if __name__ == '__main__':
 
 
 # # Find the parameters corresponding to the lowest resolution
-# lowest_resolution = min(Resolution_dict.keys())  # Find the lowest resolution (key)
-# params_for_lowest_resolution = Resolution_dict[lowest_resolution]  # Get the parameters for that resolution
+# opt_res = min(Res_dict.keys())  # Find the lowest resolution (key)
+# params_for_opt_res = Res_dict[opt_res]  # Get the parameters for that resolution
 
-# print(f"The lowest resolution is {lowest_resolution}, with parameters: {params_for_lowest_resolution}")
+# print(f"The lowest resolution is {opt_res}, with parameters: {params_for_opt_res}")
 
 # =========================================================================================
 
