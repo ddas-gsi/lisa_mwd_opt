@@ -18,32 +18,55 @@ import scipy as sc
 import matplotlib.pyplot as plt
 from itertools import product
 from datetime import datetime
-from multiprocessing import Pool
+from multiprocessing import Pool, Manager
 import subprocess
 import re
+import load_mwd 
 
-# Parameter ranges
-smoothing_L_range = np.linspace(200, 600, 3)              # Smoothing_L[ns]          
-MWD_length_range = np.linspace(500, 1500, 2)             # Trapez_moving_window_length[ns]   
-MWD_trace_start_range = np.linspace(1800, 2000, 3)        # Trapez_sample_window_0[ns]
-MWD_trace_stop_range = np.linspace(4000, 4500, 3)         # Trapez_sample_window_1[ns]
 
-# Define CPU usage for parallel processing
-cpu_usage = 0.5                                           # Use 50% of available CPU cores
+MWD_SETTINGS = load_mwd.load_mwd_settings("./set_mwd.txt")
 
-# ::: Constant Values ::: 
-# Channel ID of Diamond
-channelID = 5
+INPUT_FILE = str(MWD_SETTINGS.get("INPUT_FILE", "Not Found"))
+# print(INPUT_FILE)
+HISTOGRAM_FILE_PATH = str(MWD_SETTINGS.get("HISTOGRAM_FILE_PATH", "Not Found"))
+# print(HISTOGRAM_FILE_PATH)
+channelID = MWD_SETTINGS.get("channelID", "Not Found")
+Sampling = MWD_SETTINGS.get("Sampling", "Not Found")
+Decaytime_ch = MWD_SETTINGS.get("Decaytime_ch", "Not Found")
+FIT_RANGE_PAR = MWD_SETTINGS.get("FIT_RANGE_PAR", "Not Found")
 
-sampling = 10
-decay_time = 30500
+smoothing_L_Axis = np.linspace(MWD_SETTINGS.get("Smoothing_L_Range.start", "Not Found"), 
+                               MWD_SETTINGS.get("Smoothing_L_Range.stop", "Not Found"), 
+                               MWD_SETTINGS.get("Smoothing_L_Range.split", "Not Found"))
 
-use_cores = int(os.cpu_count()*cpu_usage) 
+MWD_length_Axis = np.linspace(MWD_SETTINGS.get("MWD_Length_Range.start", "Not Found"), 
+                              MWD_SETTINGS.get("MWD_Length_Range.stop", "Not Found"), 
+                              MWD_SETTINGS.get("MWD_Length_Range.split", "Not Found"))
 
+MWD_trace_start_Axis = np.linspace(MWD_SETTINGS.get("MWD_Trace_Start_Range.start", "Not Found"), 
+                                   MWD_SETTINGS.get("MWD_Trace_Start_Range.stop", "Not Found"), 
+                                   MWD_SETTINGS.get("MWD_Trace_Start_Range.split", "Not Found"))
+
+MWD_trace_stop_Axis = np.linspace(MWD_SETTINGS.get("MWD_Trace_Stop_Range.start", "Not Found"), 
+                                  MWD_SETTINGS.get("MWD_Trace_Stop_Range.stop", "Not Found"), 
+                                  MWD_SETTINGS.get("MWD_Trace_Stop_Range.split", "Not Found"))
+
+
+CPU_Usage = MWD_SETTINGS.get("CPU_Usage", "Not Found")
+    
+use_cores = int(os.cpu_count()*CPU_Usage) 
+
+def ensure_directory_exists(dir_path):
+    """Check if a directory exists, and create it if it doesn't."""
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+        print(f"Created directory: {dir_path}")
+    else:
+        print(f"Directory already exists: {dir_path}")
 
 def worker_function(params):
     smoothing_L, MWD_length, MWD_trace_start, MWD_trace_stop, MWD_amp_start, MWD_amp_stop, MWD_baseline_start, MWD_baseline_stop = params
-    root_command = ["root", "-l", "-q", "-b", f"mwd.C({channelID},{smoothing_L},{MWD_length},{MWD_trace_start},{MWD_trace_stop}, {MWD_amp_start}, {MWD_amp_stop}, {MWD_baseline_start}, {MWD_baseline_stop}, {sampling}, {decay_time})"]
+    root_command = ["root", "-l", "-q", "-b", f"mwd.C({channelID},{smoothing_L},{MWD_length},{MWD_trace_start},{MWD_trace_stop},{MWD_amp_start},{MWD_amp_stop},{MWD_baseline_start},{MWD_baseline_stop},{Sampling},{Decaytime_ch},{FIT_RANGE_PAR})"]
     print(f"MWD running for parameters {params}...")
     start_time = datetime.now()
     result = subprocess.run(root_command, capture_output=True, text=True)
@@ -83,6 +106,10 @@ def worker_function(params):
     lisaTraceFileMatch = re.search(r"LISA_TRACE_FILE:\s*(\S+)", result.stdout)
     lisaTraceHistFile = lisaTraceFileMatch.group(1) if lisaTraceFileMatch else None
 
+    # with progress_counter.get_lock():
+    #     progress_counter.value -= 1
+    #     print(f"Remaining parameter sets: {progress_counter.value}", end='\r')
+
     # return resolution, params, histName, histFile
     return resolution, params, lisaEnergyHistName, lisaEnergyHistFile, lisaTraceHistName, lisaMWDHistName, lisaTraceHistFile
     
@@ -93,8 +120,9 @@ def worker_function(params):
 def mwd_multicore():
 
     start_time = datetime.now()
+    ensure_directory_exists(HISTOGRAM_FILE_PATH)
 
-    param_combinations = list(product(smoothing_L_range, MWD_length_range, MWD_trace_start_range, MWD_trace_stop_range))
+    param_combinations = list(product(smoothing_L_Axis, MWD_length_Axis, MWD_trace_start_Axis, MWD_trace_stop_Axis))
 
     print(f"Total sets of parameters {len(param_combinations)} ...")
 
@@ -118,6 +146,23 @@ def mwd_multicore():
 
     with Pool(processes=use_cores) as pool:
         results = pool.map(worker_function, filtered_param_combinations)
+
+    # global progress_counter
+    # with Manager() as manager:
+    #     progress_counter = manager.Value('i', len(filtered_param_combinations))
+    #     with Pool(processes=use_cores) as pool:
+    #         results = pool.map(worker_function, filtered_param_combinations)
+
+    # with Manager() as manager:
+    #     progress_counter = manager.Value('i', len(filtered_param_combinations))
+
+    #     with Pool(processes=use_cores) as pool:
+    #         results = []
+    #         for result in pool.imap_unordered(worker_function, filtered_param_combinations):
+    #             with progress_counter.get_lock():
+    #                 progress_counter.value -= 1
+    #             print(f"Remaining parameter sets: {progress_counter.value}", end='\r')
+    #             results.append(result)
 
     Res_dict = {}
     for resolution, params, _, _, _, _, _ in results:

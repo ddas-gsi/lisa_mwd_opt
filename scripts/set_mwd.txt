@@ -1,0 +1,57 @@
+# :::: Set INPUT ROOT FILE NAME & FILE PATH :::::
+# ::: Define the Input file with proper filePath inside ""
+
+INPUT_FILE = "/u/ddas/Lustre/gamma/ddas/LISA/c4_output/run_0075_0001_c4MWD.root"
+
+# ::::::::::: Set HISTOGRAM FILE PATH :::::::::::
+
+# HISTOGRAM_FILE_PATH = "/u/ddas/Lustre/gamma/ddas/LISA/mwd_histos/"
+HISTOGRAM_FILE_PATH = "/u/ddas/c4/c4Root/macros/lisa/trace_analysis/mwd_histos/"
+
+
+# :::::::::::::: MWD PARAMETERS :::::::::::::::::
+
+# :::::: Set PARAMETER RANGE & SPLIT SIZE ::::::: 
+
+# :::Smoothing Parameter - This corresponds to Rising Time >> Smoothing_L[ns] 
+
+Smoothing_L_Range.start = 200
+Smoothing_L_Range.stop = 600
+Smoothing_L_Range.split = 3
+
+# :::Lenght of the moving window for calculation >> Trapez_moving_window_length[ns]
+
+MWD_Length_Range.start = 500.5
+MWD_Length_Range.stop = 1500
+MWD_Length_Range.split = 2
+
+# :::Start of the entire MWD trace >> Trapez_sample_window_0[ns]
+
+MWD_Trace_Start_Range.start = 1800
+MWD_Trace_Start_Range.stop = 2000
+MWD_Trace_Start_Range.split = 3
+
+# :::Stop of the entire MWD trace >> Trapez_sample_window_1[ns]
+
+MWD_Trace_Stop_Range.start = 4000
+MWD_Trace_Stop_Range.stop = 4200
+MWD_Trace_Stop_Range.split = 2
+
+# ::: Channel Number/ID
+channelID = 5
+
+# ::: Define CPU usage for parallel processing >> for 50% use 0.5
+CPU_Usage = 0.5
+
+# :::Sampling from Febex (=10 ns) >> Sampling[ns]
+Sampling = 10
+
+# ::: Decay Time of the signal (depens on the preamp) >> Decaytime_chX[ns]
+Decaytime_ch = 30500
+
+
+# ::::::::::::ENERGY HIST FIT PARAMETER ::::::::::::::
+
+# ::: Define Energy Histogram Fit Range Parameter >> Mean +- FIT_RANGE_PAR * Sigma
+
+FIT_RANGE_PAR = 2.5
