@@ -22,12 +22,12 @@ def load_mwd_settings(file_path):
 
     return params
 
-# Usage Example
-# file_path = "./set_mwd.txt"  # Path to your parameter file
+
+# file_path = "./set_mwd.txt"  
 # parameters = load_mwd_settings(file_path)
 
 # Access parameters
-# print(parameters)  # Print all loaded parameters
+# print(parameters)  
 # print("Input File:", parameters.get("INPUT_FILE", "Not Found"))
 # print("Histogram File Path:", parameters.get("HISTOGRAM_FILE_PATH", "Not Found"))
 # print("Channel ID:", parameters.get("channelID", "Not Found"))

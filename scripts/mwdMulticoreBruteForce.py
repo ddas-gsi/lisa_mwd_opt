@@ -22,6 +22,10 @@ from multiprocessing import Pool, Manager
 import subprocess
 import re
 import load_mwd 
+import threading
+import time
+
+
 
 
 MWD_SETTINGS = load_mwd.load_mwd_settings("./set_mwd.txt")
@@ -64,6 +68,16 @@ def ensure_directory_exists(dir_path):
     else:
         print(f"Directory already exists: {dir_path}")
 
+
+def monitor_progress(filtered_param_combinations):
+        while True:
+            histo_count = int(os.popen("ls -lhrt mwd_histos/ | wc -l").read().strip())
+            params_computed = int(histo_count/2)
+            # print("\n")
+            print(f"Parameters remaining: {len(filtered_param_combinations) - params_computed} ...", end='\r', flush=True)
+            time.sleep(5)  # Adjust the interval as needed
+
+
 def worker_function(params):
     smoothing_L, MWD_length, MWD_trace_start, MWD_trace_stop, MWD_amp_start, MWD_amp_stop, MWD_baseline_start, MWD_baseline_stop = params
     root_command = ["root", "-l", "-q", "-b", f"mwd.C({channelID},{smoothing_L},{MWD_length},{MWD_trace_start},{MWD_trace_stop},{MWD_amp_start},{MWD_amp_stop},{MWD_baseline_start},{MWD_baseline_stop},{Sampling},{Decaytime_ch},{FIT_RANGE_PAR})"]
@@ -85,12 +99,6 @@ def worker_function(params):
     stop_time = datetime.now()
     print('Duration:', stop_time - start_time)
 
-    # histMatch = re.search(r"HISTOGRAM:\s*(\S+)", result.stdout)
-    # histName = histMatch.group(1) if histMatch else None
-
-    # histFileMatch = re.search(r"HISTFILE:\s*(\S+)", result.stdout)
-    # histFile = histFileMatch.group(1) if histFileMatch else None
-
     lisaEnergyMatch = re.search(r"LISA_ENERGY:\s*(\S+)", result.stdout)
     lisaEnergyHistName = lisaEnergyMatch.group(1) if lisaEnergyMatch else None
 
@@ -106,15 +114,12 @@ def worker_function(params):
     lisaTraceFileMatch = re.search(r"LISA_TRACE_FILE:\s*(\S+)", result.stdout)
     lisaTraceHistFile = lisaTraceFileMatch.group(1) if lisaTraceFileMatch else None
 
+    # # Update progress counter
     # with progress_counter.get_lock():
     #     progress_counter.value -= 1
-    #     print(f"Remaining parameter sets: {progress_counter.value}", end='\r')
+    #     print(f"Remaining parameter sets: {progress_counter.value}", end='\r', flush=True)
 
-    # return resolution, params, histName, histFile
     return resolution, params, lisaEnergyHistName, lisaEnergyHistFile, lisaTraceHistName, lisaMWDHistName, lisaTraceHistFile
-    
-    
-    
 
 
 def mwd_multicore():
@@ -144,25 +149,20 @@ def mwd_multicore():
 
     print(f"Running {len(filtered_param_combinations)} sets of parameter on {use_cores} cores in parallel...")
 
+    
+
+    # Start monitoring in a separate thread
+    monitor_thread = threading.Thread(target=monitor_progress, daemon=True, args=(filtered_param_combinations,))
+    monitor_thread.start()
+
     with Pool(processes=use_cores) as pool:
         results = pool.map(worker_function, filtered_param_combinations)
 
     # global progress_counter
     # with Manager() as manager:
-    #     progress_counter = manager.Value('i', len(filtered_param_combinations))
+    #     progress_counter = manager.Value('i', len(filtered_param_combinations))  # Initialize progress counter
     #     with Pool(processes=use_cores) as pool:
     #         results = pool.map(worker_function, filtered_param_combinations)
-
-    # with Manager() as manager:
-    #     progress_counter = manager.Value('i', len(filtered_param_combinations))
-
-    #     with Pool(processes=use_cores) as pool:
-    #         results = []
-    #         for result in pool.imap_unordered(worker_function, filtered_param_combinations):
-    #             with progress_counter.get_lock():
-    #                 progress_counter.value -= 1
-    #             print(f"Remaining parameter sets: {progress_counter.value}", end='\r')
-    #             results.append(result)
 
     Res_dict = {}
     for resolution, params, _, _, _, _, _ in results:
@@ -191,13 +191,9 @@ def mwd_multicore():
 
     hList = ROOT.TList()
 
-    # Separate results into two lists: 
-    # - `positive_res_results` for histograms with resolution > 0
-    # - `non_positive_res_results` for histograms with resolution <= 0
     positive_res_results = [res for res in results if res[0] is not None and res[0] > 0]
     non_positive_res_results = [res for res in results if res[0] is not None and res[0] <= 0]
 
-    # Merge the two lists, ensuring that positive resolutions are written first
     sorted_results = sorted(positive_res_results) + sorted(non_positive_res_results)
 
     # Flag to track if lisaTraceHist has been written
@@ -251,113 +247,3 @@ if __name__ == '__main__':
     mwd_multicore()
 
 
-
-
-
-
-# =========================================================================================
-
-# import ROOT
-# import os
-# import numpy as np
-# import scipy as sc
-# import matplotlib.pyplot as plt
-# from itertools import product
-# from datetime import datetime
-# from multiprocessing import Pool
-# from functools import partial
-# import subprocess
-# import re
-# from datetime import datetime
-
-
-# def chi2(data, model):
-#     return np.sum((data - model)**2)
-
-# # Parameter ranges
-# smoothing_L_range = np.linspace(200, 600, 2)              # Smoothing_L[ns]          # np.linspace(200, 600, 10, dtype=int) 
-# MWD_length_range = np.linspace(500, 1500, 1)              # Trapez_moving_window_length[ns]   
-# MWD_trace_start_range = np.linspace(2000, 6200, 1)        # Trapez_sample_window_0[ns]
-# MWD_trace_stop_range = np.linspace(4200, 4500, 1)         # Trapez_sample_window_1[ns]
-
-# param_combinations = list(product(smoothing_L_range, MWD_length_range, MWD_trace_start_range, MWD_trace_stop_range))
-
-# Res_dict = {}
-
-# # Run the script for all parameter sets
-# for params in param_combinations:
-
-#     # Channel ID
-#     channelID = 5
-
-#     smoothing_L, MWD_length, MWD_trace_start, MWD_trace_stop = params
-#     root_command = ["root", "-l", "-q", "-b", "-n", f"mwd.C({channelID},{smoothing_L},{MWD_length},{MWD_trace_start},{MWD_trace_stop})"]
-#     print(f"mwd script is running for parameters {params}...")
-    
-#     start_time = datetime.now()
-#     # Run the command without `check=True` to prevent errors from stopping execution
-#     result = subprocess.run(root_command, capture_output=True, text=True)
-#     # print("STDOUT:", result.stdout)  # From stdout, we can check for which parameters we get this resolution... Important in case of parallel processing
-#     # print("STDERR:", result.stderr)  # Just for debugging
-
-#     # Extract Resolution from output
-#     match = re.search(r"\(double\)\s*([\d.eE+-]+)", result.stdout)
-#     if match:
-#         Resolution = float(match.group(1))
-#         print(f"Parameters {params} give Resolution = {Resolution}")
-#         Res_dict[Resolution] = params
-#     else:
-#         print(f"Error: Resolution not found in output for parameters {params}.")
-
-#     stop_time = datetime.now()
-#     print('Duration:', stop_time - start_time)
-
-
-# # Find the parameters corresponding to the lowest resolution
-# opt_res = min(Res_dict.keys())  # Find the lowest resolution (key)
-# params_for_opt_res = Res_dict[opt_res]  # Get the parameters for that resolution
-
-# print(f"The lowest resolution is {opt_res}, with parameters: {params_for_opt_res}")
-
-# =========================================================================================
-
-# start_time = datetime.now()
-# # Channel ID
-# channelID = 10
-# # Parameters
-# smoothing_L = 400
-# MWD_length = 1000
-# MWD_trace_start = 2000  
-# MWD_trace_stop = 4200
-
-# # parameter sets
-# param_sets = [
-#     (2,400,1000,2000,4200),
-#     (5,400,1000,2000,4200),
-#     (10,400,1000,2000,4200)
-#     ]
-# processes = []
-# for params in param_sets:
-#     channelID, smoothing_L, MWD_length, MWD_trace_start, MWD_trace_stop = params
-#     root_command = ["root", "-l", "-q", "-b", f"mwd.C({channelID},{smoothing_L},{MWD_length},{MWD_trace_start},{MWD_trace_stop})"]
-#     print("mwd script is running ...")
-    
-#     # Start subprocess in parallel
-#     process = subprocess.Popen(root_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-#     processes.append((process,params))
-    
-
-# # Collect results
-# for process, params in processes:
-#     stdout, stderr = process.communicate()
-#     match = re.search(r"\(double\)\s*([\d.eE+-]+)", stdout)
-#     if match:
-#         Resolution = float(match.group(1))
-#         print(f"Parameters {params} give Resolution = {Resolution}")
-#     else:
-#         print(f"Error: Resolution not found in output for parameters {params}.")
-
-# stop_time = datetime.now()
-# print('Duration:', stop_time - start_time)
-
-# =========================================================================================

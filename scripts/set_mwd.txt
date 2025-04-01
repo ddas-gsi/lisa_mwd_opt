@@ -17,13 +17,13 @@ HISTOGRAM_FILE_PATH = "/u/ddas/c4/c4Root/macros/lisa/trace_analysis/mwd_histos/"
 
 Smoothing_L_Range.start = 200
 Smoothing_L_Range.stop = 600
-Smoothing_L_Range.split = 3
+Smoothing_L_Range.split = 5
 
 # :::Lenght of the moving window for calculation >> Trapez_moving_window_length[ns]
 
 MWD_Length_Range.start = 500.5
 MWD_Length_Range.stop = 1500
-MWD_Length_Range.split = 2
+MWD_Length_Range.split = 11
 
 # :::Start of the entire MWD trace >> Trapez_sample_window_0[ns]
 
@@ -35,7 +35,7 @@ MWD_Trace_Start_Range.split = 3
 
 MWD_Trace_Stop_Range.start = 4000
 MWD_Trace_Stop_Range.stop = 4200
-MWD_Trace_Stop_Range.split = 2
+MWD_Trace_Stop_Range.split = 3
 
 # ::: Channel Number/ID
 channelID = 5
