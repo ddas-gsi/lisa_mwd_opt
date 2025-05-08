@@ -17,19 +17,19 @@ HISTOGRAM_FILE_PATH = "/u/ddas/c4/c4Root/macros/lisa/trace_analysis/mwd_histos2/
 # :::Smoothing Parameter - This corresponds to Rising Time >> Smoothing_L[ns] 
 
 Smoothing_L_Range.start = 10
-Smoothing_L_Range.stop = 70
-Smoothing_L_Range.split = 7
+Smoothing_L_Range.stop = 610
+Smoothing_L_Range.split = 50
 
 # :::Lenght of the moving window for calculation >> Trapez_moving_window_length[ns]
 
 MWD_Length_Range.start = 50
-MWD_Length_Range.stop = 500
-MWD_Length_Range.split = 6
+MWD_Length_Range.stop = 1000
+MWD_Length_Range.split = 20
 
 # :::Start of the entire MWD trace >> Trapez_sample_window_0[ns]
 
 MWD_Trace_Start_Range.start = 1000
-MWD_Trace_Start_Range.stop = 1100
+MWD_Trace_Start_Range.stop = 1200
 MWD_Trace_Start_Range.split = 11
 
 # :::Stop of the entire MWD trace >> Trapez_sample_window_1[ns]
@@ -48,7 +48,7 @@ CPU_Usage = 0.5
 Sampling = 10
 
 # ::: Decay Time of the signal (depens on the preamp) >> Decaytime_chX[ns]
-Decaytime_ch = 2183
+Decaytime_ch = 2238.8
 
 
 # ::::::::::::ENERGY HIST FIT PARAMETER ::::::::::::::
