@@ -58,7 +58,8 @@ std::vector<float> calcBaselineCorrectedTrace(std::vector<float> &trace_febex)
 
     for (int i = 0; i < trace_febex.size(); i++)
     {
-        trace_febex.at(i) = (trace_febex.at(i) - average_baseline); // don't divide by 8, it's valid for Pareeksha for ADC to mV conversion
+        trace_febex.at(i) = (trace_febex.at(i) - average_baseline);
+        // trace_febex.at(i) = (trace_febex.at(i) - average_baseline) / 8.0; // dividing by 8 makes ADC channel to mV conversion. 8000 ADC = 1000 mV
     }
     return trace_febex;
 }
@@ -229,9 +230,9 @@ double mwd_shiyan(int channelID, double smoothing_L, double MWD_length, double M
     // TString lisa_Energy_histTitle = Form("lisa_Energy >> L:%d M:%d k0:%d kend:%d a:%d b:%d c:%d d:%d",
     //                                      int(smoothing_L), int(MWD_length), int(MWD_trace_start), int(MWD_trace_stop) int(MWD_amp_start), int(MWD_amp_stop), int(MWD_baseline_start), int(MWD_baseline_stop));
 
-    TH2F *lisa_Trace = new TH2F("lisa_Trace", "lisa_Trace", 500, 0, 500, 1000, 0, 1000);
+    TH2F *lisa_Trace = new TH2F("lisa_Trace", "lisa_Trace", 500, 0, 500, 1000, 0, -1000); // change y-range depending on positive or negative polarity of Trace
 
-    TH2F *lisa_MWD = new TH2F(lisa_MWD_histName, "lisa_MWD", 500, 0, 500, 1000, 0, 1000);
+    TH2F *lisa_MWD = new TH2F(lisa_MWD_histName, "lisa_MWD", 500, 0, 500, 1000, 0, -1000); // change y-range depending on positive or negative polarity of Trace
 
     TH1F *lisa_Energy = new TH1F(lisa_Energy_histName, "lisa_Energy", 1000, 10, 1010);
 
